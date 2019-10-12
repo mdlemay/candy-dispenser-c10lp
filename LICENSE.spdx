@@ -1,0 +1,6 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+PackageName: candy-dispenser-c10lp
+PackageOriginator: Michael LeMay
+PackageHomePage: https://github.com/mdlemay/candy-dispenser-c10lp
+PackageLicenseDeclared: MIT
