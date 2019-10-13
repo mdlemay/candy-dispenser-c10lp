@@ -47,15 +47,15 @@ end
 assign led = clk_1;
 
 // init values for generating servo PWM control with a unit of 1MHz terms:
-reg [10:0] servo_init_retracted = 1000;
-reg [10:0] servo_init_extended = 2000;
+reg [10:0] servo_init_retracted = 1500;
+reg [10:0] servo_init_extended = 700;
 reg [10:0] pwm_width_init = 0;
 // counter to be decremented while sending the PWM pulse:
 reg [10:0] pwm_width_ctr = 0;
 // 14-bit counter incremented on 1MHz clock to implement a 16ms resend timer:
-reg [11:0] pwm_resend_ctr = 0;
-// 20-bit counter decremented on a 1MHz clock to implement a 1s travel-time counter:
-reg [19:0] servo_travel_ctr = 0;
+reg [13:0] pwm_resend_ctr = 0;
+// 18-bit counter decremented on a 1MHz clock to implement a 250ms travel-time counter:
+reg [17:0] servo_travel_ctr = 0;
 reg servo_travel_req = 0;
 
 always @(posedge clk_1m) begin
@@ -77,12 +77,15 @@ end
 
 reg debounced_pr0 = 0;
 reg [9:0] debounced_pr0_lvl = 0;
+// this is set when dispensing begins and remains set until
+// both dispensing is complete and the hand has been removed.
+reg hand_remaining = 0;
 
 always @(posedge clk_1k) begin
-    if (pr0 == 1 && debounced_pr0_lvl < 1000) begin
+    if (pr0 == 0 && debounced_pr0_lvl < 1000) begin
         debounced_pr0_lvl <= debounced_pr0_lvl + 1;
     end
-    if (pr0 == 0 && 0 < debounced_pr0_lvl) begin
+    if (pr0 == 1 && 0 < debounced_pr0_lvl) begin
         debounced_pr0_lvl <= debounced_pr0_lvl - 1;
     end
 
@@ -91,21 +94,25 @@ always @(posedge clk_1k) begin
     debounced_pr0 <= 750 < debounced_pr0_lvl;
 
     if (servo_travel_ctr == 0) begin
-        // the previous servo travel command already completed.
-        if (debounced_pr0 == 1) begin
-            // the desired servo position is extended.
-            if (pwm_width_init != servo_init_extended) begin
-                // start the servo's travel to the extended position.
-                pwm_width_init <= servo_init_extended;
-                servo_travel_req <= 1;
-            end
+        if (pwm_width_init == servo_init_extended && hand_remaining == 1) begin
+            pwm_width_init <= servo_init_retracted;
+            // start the servo's travel to the retracted position.
+            servo_travel_req <= 1;
         end else begin
-            // the desired servo position is retracted.
-            if (pwm_width_init != servo_init_retracted) begin
-                // start the servo's travel to the retracted position.
-                pwm_width_init <= servo_init_retracted;
-                servo_travel_req <= 1;
-            end            
+            if (debounced_pr0 == 0) begin
+                hand_remaining <= 0;
+            end
+
+            // the previous servo travel command already completed.
+            if (debounced_pr0 == 1 && hand_remaining == 0) begin
+                // the desired servo position is extended.
+                if (pwm_width_init != servo_init_extended) begin
+                    // start the servo's travel to the extended position.
+                    pwm_width_init <= servo_init_extended;
+                    servo_travel_req <= 1;
+                    hand_remaining <= 1;
+                end
+            end
         end
     end else begin
         servo_travel_req <= 0;
