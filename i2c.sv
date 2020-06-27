@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // 100kHz I2C interface
-module i2c(clk_100k, clk_200k, sda, scl, req, dir, done, addr, dat_to_slv, dat_from_slv);
+module i2c(clk_100k, clk_200k, sda, scl, req, done, addr, dat_to_slv, dat_from_slv);
     localparam ADDR_LEN = 7;
     localparam DAT_LEN = 8;
     input clk_100k;
@@ -10,14 +10,13 @@ module i2c(clk_100k, clk_200k, sda, scl, req, dir, done, addr, dat_to_slv, dat_f
     inout sda;
     output scl;
     input req;
-    input dir;
     output done;
     input [ADDR_LEN-1:0] addr;
     input [DAT_LEN-1:0] dat_to_slv;
     output [DAT_LEN-1:0] dat_from_slv;
 
     typedef enum integer {
-        IDLE, START, SHIFT_ADDR, SEND_DIR, ACK_ADDR, RX, TX, ACK_DAT, STOP0, STOP1
+        IDLE, START, SHIFT_ADDR, SEND_DIR, ACK_ADDR, RX, TX, ACK_DAT, STOP0, STOP1, RESTART
     } Phase;
 
     Phase phase = IDLE;
@@ -30,10 +29,12 @@ module i2c(clk_100k, clk_200k, sda, scl, req, dir, done, addr, dat_to_slv, dat_f
 
     localparam READ_DIR = 1;
     localparam WRITE_DIR = 0;
+    reg dir;
 
     initial begin
         done = 0;
         sda = 'bz;
+        dir = WRITE_DIR;
     end
 
     always @(negedge clk_200k) begin
@@ -52,10 +53,16 @@ module i2c(clk_100k, clk_200k, sda, scl, req, dir, done, addr, dat_to_slv, dat_f
                 scl_on <= 1;
                 shift_ctr <= ADDR_LEN-1;
                 end
+            RESTART: begin
+                sda <= 1;
+                next_phase = START;
+                dir <= READ_DIR; // switch to reading register value after restart
+                end
             STOP1: begin
                 sda <= 'bz;
                 scl_on <= 0;
                 done <= 1;
+                dir <= WRITE_DIR; // prepare for next request
                 next_phase = IDLE;
                 end
             default:
@@ -97,8 +104,12 @@ module i2c(clk_100k, clk_200k, sda, scl, req, dir, done, addr, dat_to_slv, dat_f
                     next_phase = phase;
                 end
                 end
-            ACK_DAT:
+            ACK_DAT: begin
                 sda <= 'bz;
+                if (dir == WRITE_DIR) begin
+                    next_phase = RESTART;
+                end
+                end
                 // FIXME: check for appropriate data ack once back in IDLE.
             STOP0: begin
                 sda <= 0;
