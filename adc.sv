@@ -12,10 +12,7 @@ module adc(clk_100k, clk_200k, sda, scl, req, done, base_reg, val);
     input [7:0] base_reg;
     output [11:0] val;
 
-    localparam I2C_READ_DIR = 1;
-    localparam I2C_WRITE_DIR = 0;
-
-    reg i2c_req, i2c_dir;
+    reg i2c_req;
     wire i2c_done;
     // Set to 0 when accessing the base register and 1 when accessing the second register.
     wire i2c_phase;
@@ -24,10 +21,10 @@ module adc(clk_100k, clk_200k, sda, scl, req, done, base_reg, val);
     wire [7:0] i2c_reg_addr = {base_reg[7:1],i2c_phase};
     wire [7:0] i2c_dat_from_slv;
 
-    i2c i2c(clk_100k, clk_200k, sda, scl, i2c_req, i2c_dir, i2c_done,
+    i2c i2c(clk_100k, clk_200k, sda, scl, i2c_req, i2c_done,
             i2c_addr, i2c_reg_addr, i2c_dat_from_slv);
 
-    typedef enum { RD_REG_IDLE, ADDR, DAT } RdRegPhase;
+    typedef enum { RD_REG_IDLE, WAIT } RdRegPhase;
 
     RdRegPhase rd_reg_phase = RD_REG_IDLE;
     reg rd_reg_req = 0;
@@ -36,21 +33,11 @@ module adc(clk_100k, clk_200k, sda, scl, req, done, base_reg, val);
         case (rd_reg_phase)
         RD_REG_IDLE: begin
             if (rd_reg_req) begin
-                rd_reg_phase <= ADDR;
+                rd_reg_phase <= WAIT;
                 i2c_req <= 1;
-                i2c_dir <= I2C_WRITE_DIR;
             end
         end
-        ADDR: begin
-            if (i2c_done) begin
-                rd_reg_phase <= DAT;
-                i2c_req <= 1;
-                i2c_dir <= I2C_READ_DIR;
-            end else begin
-                i2c_req <= 0;
-            end
-        end
-        DAT: begin
+        WAIT: begin
             if (i2c_done) begin
                 rd_reg_phase <= RD_REG_IDLE;
             end else begin

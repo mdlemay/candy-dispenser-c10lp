@@ -1,7 +1,8 @@
 // Copyright (C) 2019 Michael LeMay
 // SPDX-License-Identifier: MIT
 
-module pwm(clk_1M, pwm_ctrl, req, idle, width);
+// Generate a train of repeated pulse-width-modulated control signals
+module pwm_train(clk_1M, pwm_ctrl, req, idle, width);
     input clk_1M;
     output pwm_ctrl;
     input req;
