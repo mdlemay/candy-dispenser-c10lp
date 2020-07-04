@@ -1,12 +1,12 @@
-module candy_dispenser_c10lp(clk_50m, led, servo, btn0);
 // Copyright (C) 2019 Michael LeMay
 // SPDX-License-Identifier: MIT
 
+module candy_dispenser_c10lp(clk_50m, led, servo, pr0);
 
-input clk_50m;
-output led; // pin L14
-output servo; // pin G2
-input btn0; // pin E15
+input clk_50m; // pin E1   - fixed 50MHz clock
+output led;    // pin L14  - LED 0
+output servo;  // pin G2   - Arduino IO4 - servo control
+input pr0;     // pin F3   - Arduino IO2 - photoresistor
 
 // divide 50MHz clock to 1MHz:
 reg clk_1m = 0;
@@ -75,24 +75,24 @@ always @(posedge clk_1m) begin
     pwm_resend_ctr <= pwm_resend_ctr + 1;
 end
 
-reg debounced_btn0 = 0;
-reg [9:0] debounced_btn0_lvl = 0;
+reg debounced_pr0 = 0;
+reg [9:0] debounced_pr0_lvl = 0;
 
 always @(posedge clk_1k) begin
-    if (btn0 == 1 && debounced_btn0_lvl < 1000) begin
-        debounced_btn0_lvl <= debounced_btn0_lvl + 1;
+    if (pr0 == 1 && debounced_pr0_lvl < 1000) begin
+        debounced_pr0_lvl <= debounced_pr0_lvl + 1;
     end
-    if (btn0 == 0 && 0 < debounced_btn0_lvl) begin
-        debounced_btn0_lvl <= debounced_btn0_lvl - 1;
+    if (pr0 == 0 && 0 < debounced_pr0_lvl) begin
+        debounced_pr0_lvl <= debounced_pr0_lvl - 1;
     end
 
     // The button is considered to be pressed if it has been pressed for 75%
     // of the preceding second:
-    debounced_btn0 <= 750 < debounced_btn0_lvl;
+    debounced_pr0 <= 750 < debounced_pr0_lvl;
 
     if (servo_travel_ctr == 0) begin
         // the previous servo travel command already completed.
-        if (debounced_btn0 == 1) begin
+        if (debounced_pr0 == 1) begin
             // the desired servo position is extended.
             if (pwm_width_init != servo_init_extended) begin
                 // start the servo's travel to the extended position.
